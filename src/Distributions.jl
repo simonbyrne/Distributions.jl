@@ -230,4 +230,7 @@ include("kde.jl")
 # Expectations, entropy, KL divergence
 include("functionals.jl")
 
+# Relationshup between distributions
+include("relations.jl")
+
 end # module

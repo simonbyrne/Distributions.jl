@@ -44,16 +44,12 @@ logcdf(d::Normal, x::Real) = logΦ(zval(d,x))
 logΦc(z::Real) = z > 1.0 ? log(0.5*erfcx(z/√2)) - 0.5*z*z : log1p(-0.5*erfc(-z/√2))
 logccdf(d::Normal, x::Real) = logΦc(zval(d,x))    
 
-# Algorithm PPND16 from:
+# Based on:
 #   Wichura, M.J. (1988) Algorithm AS 241: The Percentage Points of the Normal Distribution
 #   Journal of the Royal Statistical Society. Series C (Applied Statistics), Vol. 37, No. 3, pp. 477-484
 function Φinv(p::Real)
-    if p <= 0.0
-        return -inf(Float64)
-    elseif p >= 1.0
-        return inf(Float64)
-    end
-    q = p - 0.5    
+    q = p - 0.5
+    absq = abs(q)
     if abs(q) <= 0.425 
         r = 0.180625 - q*q
         return q * @horner(r,
@@ -75,6 +71,11 @@ function Φinv(p::Real)
                 2.87290_85735_72194_2674e4, 
                 5.22649_52788_52854_5610e3)
     else
+        if p <= 0.0
+            return p == 0.0 ? -inf(Float64) : nan(Float64)
+        elseif p >= 1.0 
+            return p == 1.0 ? inf(Float64) : nan(Float64)
+        end
         r = sqrt(q < 0 ? -log(p) : -log1p(-p))
         if r < 5.0
             r -= 1.6
@@ -122,13 +123,6 @@ function Φinv(p::Real)
 end
 
 function logΦinv(logp::Real)
-    if logp == 0.0
-        return inf(Float64)
-    elseif logp == -Inf
-        return inf(Float64)
-    elseif logp > 0.0
-        return nan(Float64)
-    end
     q = exp(logp) - 0.5    
     if abs(q) <= 0.425 
         r = 0.180625 - q*q
@@ -151,6 +145,11 @@ function logΦinv(logp::Real)
                 2.87290_85735_72194_2674e4, 
                 5.22649_52788_52854_5610e3)
     else
+        if logp == -Inf
+            return -inf(Float64)
+        elseif logp >= 0.0 
+            return logp == 0.0 ? inf(Float64) : nan(Float64)
+        end
         r = sqrt(q < 0 ? -logp : -log(-expm1(logp)))
         if r < 5.0
             r -= 1.6

@@ -8,8 +8,8 @@ end
 insupport(::Kolmogorov, x::Real) = zero(x) <= x < Inf
 insupport(::Type{Kolmogorov}, x::Real) = zero(x) <= x < Inf
 
-mean(d::Kolmogorov) = sqrt(pi/2.0) * log(2.0)
-var(d::Kolmogorov) = pi^2/12.0 - pi/2.0*log(2.0)^2
+mean(d::Kolmogorov) = 0.5*√2π*log(2.0)
+var(d::Kolmogorov) = pi*pi/12.0 - 0.5*pi*log(2.0)^2
 # TODO: higher-order moments also exist, can be obtained by differentiating series
 
 # cdf and ccdf are based on series truncation.
@@ -64,6 +64,63 @@ function pdf(d::Kolmogorov,x::Real)
             s += (iseven(i) ? -1 : 1)*i^2*exp(-2.0*(i*x)^2)
         end
         return 8.0*x*s
+    end
+end
+
+# Devroye IV.5
+
+
+
+function rand(d::Kolmogorov)
+    # p = cdf(d,t)
+    if rand() < p
+        # left interval
+        while true
+            # generate truncated gamma variate
+            # g = rand(Truncated(Gamma(1.5,1.0),0.0,t))
+            tp = pi*pi/(8*t*t)
+            acc = false
+            while !acc
+                e0, e1 = Base.Random.randmtzig_exprnd(), Base.Random.randmtzig_exprnd()
+                e0 = e= / (1- 1/(2*tp))
+                e1 = 2*e1
+                g = tp + e0
+                acc = (e0*e0 <= tp*e1*(g+tp)) || (g/tp - 1 - log(g/tp) <= e1)
+            end
+
+            x = pi/sqrt(8g)
+            w = 0
+            z = 1/(2*g)
+            p = exp(-g)
+            n = 1
+            q = 1
+            u = rand()
+            while u >= w
+                w += z*q
+                if u >= w
+                    return w
+                end
+                n += 2
+                q = p^(n*n-1)
+                w -= n*n*q
+            end
+        end
+    else
+        e = Base.Random.randmtzig_exprnd()
+        u = rand()
+        x = sqrt(t*t+e/2)
+        w = 0
+        n = 1
+        z = exp(-2*x*x)
+        while u > w
+            n += 1
+            w += n*n*z^(n*n-1)
+            if u >= w
+                return x
+            end
+            n += 1
+            w -= n*n*z^(n*n-1)
+        end
     end
 end
 

@@ -66,14 +66,14 @@ function GammaGDSampler(g::Gamma)
     GammaGDSampler(a,s2,s,i2s,d,q0,b,σ,c,g.scale)
 end
 
-function rand(s::GammaGDSampler)
+function rand(r::AbstractRNG,s::GammaGDSampler)
     # Step 2
-    t = randn()
+    t = randn(r)
     x = s.s + 0.5t
     t >= 0.0 && return x*x*s.scale
 
     # Step 3
-    u = rand()
+    u = rand(r)
     s.d*u <= t*t*t && return x*x*s.scale
 
     # Step 5
@@ -101,8 +101,8 @@ function rand(s::GammaGDSampler)
 
     # Step 8
     @label step8
-    e = randexp()
-    u = 2.0rand() - 1.0
+    e = randexp(r)
+    u = 2.0rand(r) - 1.0
     t = s.b + e*s.σ*sign(u)
 
     # Step 9
@@ -153,11 +153,11 @@ function GammaGSSampler(d::Gamma)
     GammaGSSampler(a,ia,b,d.scale)
 end
 
-function rand(s::GammaGSSampler)
+function rand(r::AbstractRNG, s::GammaGSSampler)
     while true
         # step 1
-        p = s.b*rand()
-        e = randexp()
+        p = s.b*rand(r)
+        e = randexp(r)
         if p <= 1.0
             # step 2
             x = exp(log(p)*s.ia)
@@ -190,16 +190,16 @@ function GammaMTSampler(g::Gamma)
     GammaMTSampler(d, c, κ)
 end
 
-function rand(s::GammaMTSampler)
+function rand(r::AbstractRNG, s::GammaMTSampler)
     while true
-        x = randn()
+        x = randn(r)
         v = 1.0 + s.c * x
         while v <= 0.0
-            x = randn()
+            x = randn(r)
             v = 1.0 + s.c * x
         end
         v *= (v * v)
-        u = rand()
+        u = rand(r)
         x2 = x * x
         if u < 1.0 - 0.331 * abs2(x2)
             return v*s.κ
@@ -222,21 +222,40 @@ function GammaIPSampler{S<:Sampleable}(d::Gamma,::Type{S})
 end
 GammaIPSampler(d::Gamma) = GammaIPSampler(d,GammaMTSampler)
 
-function rand(s::GammaIPSampler)
-    x = rand(s.s)
-    e = randexp()
+function rand(r::AbstractRNG, s::GammaIPSampler)
+    x = rand(r, s.s)
+    e = randexp(r)
     x*exp(s.nia*e)
 end
 
-# function sampler(d::Gamma)
-#     if d.shape < 1.0
-#         # TODO: d.shape = 0.5 : use scaled chisq
-#         GammaIPSampler(d)
-#     elseif d.shape == 1.0
-#         Exponential(d.scale)
-#     else
-#         GammaGDSampler(d)
-#     end
-# end
 
-# rand(d::Gamma) = rand(sampler(d))
+function rand(r::AbstractRNG, d::Gamma)
+    if d.shape < 1.0
+        rand(r, GammaIPSampler(d))
+    elseif d.shape == 1.0
+        rand(r, Exponential(d.scale))
+    else
+        rand(r, GammaGDSampler(d))
+    end
+end
+
+function rand!(r::AbstractRNG, d::Gamma, A::AbstractArray)
+    if d.shape < 1.0
+        rand!(r, GammaIPSampler(d), A)
+    elseif d.shape == 1.0
+        rand!(r, Exponential(d.scale), A)
+    else
+        rand!(r, GammaGDSampler(d), A)
+    end
+end
+
+# Select optimal sampler
+@sampler d::Gamma begin
+    if d.shape < 1.0
+        @rand GammaIPSampler(d)
+    elseif d.shape == 1.0
+        @rand Exponential(d.scale)
+    else
+        @rand GammaMTSampler(d)
+    end
+end
